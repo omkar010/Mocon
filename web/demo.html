@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mocon Test Bench</title>
+<style>
+  :root { --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --card: #fff; --line: #e2e2dd; --accent: #2f6fde; --on: #2e7d32; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --fg: #ecece8; --muted: #9a9a94; --card: #1f1f1d; --line: #33332f; --accent: #6d9cf0; --on: #66bb6a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px; display: grid; gap: 16px; grid-template-columns: 1fr 320px; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+  h1 { font-size: 20px; margin: 0 0 4px; grid-column: 1 / -1; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  #view { height: 420px; padding: 0; overflow: hidden; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  pre { font: 12px/1.5 ui-monospace, monospace; margin: 0; white-space: pre-wrap; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .b { min-width: 34px; text-align: center; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px; }
+  .b.on { background: var(--on); border-color: var(--on); color: #fff; }
+  #swing { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mocon test bench</h1>
+  <div class="card" id="view"></div>
+  <div style="display:grid; gap:16px; align-content:start">
+    <div class="card">
+      <div class="row">
+        <button class="primary" id="connect">Connect phone</button>
+        <button id="recenter" disabled>Recenter</button>
+        <button id="buzz" disabled>Buzz</button>
+      </div>
+      <div class="row">
+        <button id="layoutSword" disabled>Sword layout</button>
+        <button id="layoutPad" disabled>Joystick layout</button>
+      </div>
+      <div id="status" class="muted">Open the Mocon app on your phone, then press Connect.</div>
+    </div>
+    <div class="card">
+      <pre id="data">–</pre>
+      <div class="btns" id="buttons"></div>
+      <div class="muted" style="margin-top:8px">Last swing: <span id="swing">–</span></div>
+    </div>
+    <p class="muted">Hold the phone like a sword hilt: top pointing at this screen, display facing up, then tap Recenter on the phone.</p>
+  </div>
+</main>
+
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { Mocon } from './mocon.js';
+
+const $ = (id) => document.getElementById(id);
+const pad = new Mocon();
+
+// --- Scene: a simple blade that follows the phone.
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.position.set(0, 0.6, 3);
+camera.lookAt(0, 0, 0);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(2, 3, 2);
+scene.add(sun);
+
+const sword = new THREE.Group();
+const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.015, 1.6), new THREE.MeshStandardMaterial({ color: 0xc9d1d9, metalness: 0.8, roughness: 0.25 }));
+blade.position.z = -0.95; // blade extends forward (−z) from the hand
+const guard = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, 0.05), new THREE.MeshStandardMaterial({ color: 0x8a6d3b }));
+guard.position.z = -0.15;
+const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3), new THREE.MeshStandardMaterial({ color: 0x3b2a1a }));
+grip.rotation.x = Math.PI / 2;
+sword.add(blade, guard, grip);
+sword.position.set(0, -0.3, 0.8);
+scene.add(sword);
+
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+const target = new THREE.Quaternion();
+renderer.setAnimationLoop(() => {
+  const q = Mocon.toThree(pad.state.quaternion);
+  target.set(q.x, q.y, q.z, q.w);
+  sword.quaternion.slerp(target, 0.6); // light smoothing
+  renderer.render(scene, camera);
+});
+
+// --- Controller wiring.
+const controls = ['recenter', 'buzz', 'layoutSword', 'layoutPad'];
+pad.addEventListener('connect', (e) => {
+  $('status').textContent = `Connected: ${e.detail.model} (protocol v${e.detail.version})`;
+  controls.forEach((id) => ($(id).disabled = false));
+  $('connect').textContent = 'Disconnect';
+});
+pad.addEventListener('disconnect', () => {
+  $('status').textContent = 'Disconnected.';
+  controls.forEach((id) => ($(id).disabled = true));
+  $('connect').textContent = 'Connect phone';
+});
+
+let packets = 0, rate = 0;
+setInterval(() => { rate = packets; packets = 0; }, 1000);
+pad.addEventListener('motion', (e) => {
+  packets++;
+  const { quaternion: q, gyro: g, accel: a } = e.detail;
+  const f = (n) => n.toFixed(2).padStart(6);
+  $('data').textContent =
+    `rate   ${rate} Hz\n` +
+    `quat   w${f(q.w)} x${f(q.x)} y${f(q.y)} z${f(q.z)}\n` +
+    `gyro   ${f(g.x)} ${f(g.y)} ${f(g.z)} rad/s\n` +
+    `accel  ${f(a.x)} ${f(a.y)} ${f(a.z)} m/s²\n` +
+    `joy    ${f(pad.state.joystick.x)} ${f(pad.state.joystick.y)}`;
+
+  // Swing detection: a short burst of fast rotation.
+  if (Mocon.speed(g) > 8 && performance.now() - lastSwing > 300) {
+    lastSwing = performance.now();
+    $('swing').textContent = `${Mocon.speed(g).toFixed(1)} rad/s at ${new Date().toLocaleTimeString()}`;
+    pad.vibrate(40).catch(() => {});
+  }
+});
+let lastSwing = 0;
+
+pad.addEventListener('input', () => {
+  const el = $('buttons');
+  el.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const s = document.createElement('span');
+    s.className = 'b' + (pad.isPressed(i) ? ' on' : '');
+    s.textContent = i;
+    el.appendChild(s);
+  }
+});
+
+$('connect').onclick = async () => {
+  if (pad.connected) return pad.disconnect();
+  try {
+    await pad.connect();
+    await pad.setLayout({ title: 'Test bench', buttons: ['A', 'B', 'C', 'D'] });
+  } catch (err) {
+    $('status').textContent = err.message;
+  }
+};
+$('recenter').onclick = () => pad.recenter();
+$('buzz').onclick = () => pad.vibrate(200);
+$('layoutSword').onclick = () => pad.setLayout({ title: 'Sword', buttons: ['Block', 'Special'] });
+$('layoutPad').onclick = () => pad.setLayout({ title: 'Racer', buttons: ['Boost'], joystick: true, showRecenter: false });
+
+if (!Mocon.isSupported()) {
+  $('status').textContent = 'This browser has no Web Bluetooth. Use Chrome or Edge, over https:// or localhost.';
+  $('connect').disabled = true;
+}
+</script>
+</body>
+</html>

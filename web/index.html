@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mocon Games</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #f6f5f1; --fg: #1c1c1a; --muted: #6a6a64; --card: #fff; --line: #e3e1da; --accent: #2f6fde; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141413; --fg: #efede6; --muted: #9c9a92; --card: #1e1e1c; --line: #33322e; --accent: #7aa5f2; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 Inter, system-ui, sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 48px 16px 64px; }
+  h1 { font-size: clamp(32px, 6vw, 48px); font-weight: 800; margin: 0 0 8px; letter-spacing: -.02em; }
+  .lede { color: var(--muted); max-width: 620px; margin: 0 0 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  a.game { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: inherit; background: var(--card);
+           border: 1px solid var(--line); border-radius: 16px; padding: 20px; transition: transform .15s, border-color .15s; }
+  a.game:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .swatch { height: 96px; border-radius: 10px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+  a.game b { font-size: 19px; }
+  a.game span { color: var(--muted); font-size: 14px; }
+  .tag { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .steps { margin-top: 40px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 24px; }
+  .steps h2 { font-size: 18px; margin: 0 0 8px; }
+  .steps ol { margin: 0; padding-left: 20px; color: var(--muted); }
+  .steps li { margin: 4px 0; }
+  #support { margin-top: 16px; font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mocon Games</h1>
+  <p class="lede">Your Android phone is the controller. Open the Mocon app, pick a game, and connect over Bluetooth. Every game also plays with a mouse or keyboard.</p>
+  <div class="grid">
+    <a class="game" href="sword/">
+      <div class="swatch" style="background:linear-gradient(135deg,#1b1f2a,#5a4630)">⚔️</div>
+      <b>Sword Duel</b>
+      <span>Slash past guards and parry glowing strikes in a first-person duel.</span>
+      <span class="tag">Swing · parry</span>
+    </a>
+    <a class="game" href="cadence/">
+      <div class="swatch" style="background:linear-gradient(135deg,#0b0c22,#ff3fb4)">🎵</div>
+      <b>Cadence</b>
+      <span>Cut flying blocks on the beat in the direction of each arrow.</span>
+      <span class="tag">Rhythm · swing direction</span>
+    </a>
+    <a class="game" href="tiltway/">
+      <div class="swatch" style="background:linear-gradient(135deg,#12312f,#f4a259)">🟠</div>
+      <b>Tiltway</b>
+      <span>Tilt the board to roll a steel ball past holes and over narrow bridges.</span>
+      <span class="tag">Tilt · precision</span>
+    </a>
+    <a class="game" href="cricket/">
+      <div class="swatch" style="background:linear-gradient(135deg,#0e2a1a,#58a845)">🏏</div>
+      <b>Boundary</b>
+      <span>Bat in a 3D stadium: time your swing, place it in the gaps, clear the rope.</span>
+      <span class="tag">Cricket · timing · placement</span>
+    </a>
+    <a class="game" href="demo.html">
+      <div class="swatch" style="background:linear-gradient(135deg,#dfe6f3,#9fb4dd)">🧪</div>
+      <b>Test bench</b>
+      <span>Live sensor readings, button states and layout switching, for checking your phone.</span>
+      <span class="tag">Tools</span>
+    </a>
+  </div>
+  <div class="steps">
+    <h2>Playing with your phone</h2>
+    <ol>
+      <li>Install and open the Mocon app on your Android phone, and allow Bluetooth.</li>
+      <li>Open a game here in Chrome or Edge on your computer.</li>
+      <li>Press <b>Connect phone</b> and choose your phone from the list.</li>
+    </ol>
+    <p id="support"></p>
+  </div>
+</main>
+<script>
+  if (!navigator.bluetooth) {
+    document.getElementById('support').textContent =
+      "This browser can't use Bluetooth, so phone control won't work here. Use Chrome or Edge, or play with a mouse.";
+  }
+</script>
+</body>
+</html>

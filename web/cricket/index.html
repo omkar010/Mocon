@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boundary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,800;1,800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0b1a33; --navy2: #13284c; --teal: #0f7c78; --gold: #ffcc33; --red: #e63946; --blue: #2d7ff9; --purple: #8e44ec;
+    --fg: #ffffff; --muted: #b9c6d6; --panel: rgba(9, 20, 40, .92); --line: rgba(255, 204, 51, .4);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a33; color: var(--fg); font: 15px/1.5 Inter, system-ui, sans-serif; }
+  canvas { display: block; }
+  .cond { font-family: 'Barlow Condensed', sans-serif; }
+  button { font: 700 14px Inter, system-ui, sans-serif; padding: 12px 22px; border-radius: 4px; border: 1px solid rgba(255,255,255,.18);
+           background: rgba(255,255,255,.07); color: var(--fg); cursor: pointer; letter-spacing: .02em; transition: background .15s, transform .1s; }
+  button:hover { background: rgba(255,255,255,.14); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: linear-gradient(180deg, #ffd65c, #f2b705); border-color: #f2b705; color: #1b1300; }
+  button.primary:hover { background: linear-gradient(180deg, #ffe08a, #ffc61a); }
+  button:disabled { opacity: .45; cursor: default; }
+
+  /* ---------------- HUD ---------------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; transition: opacity .3s; }
+  /* Broadcast-lens falloff toward the corners. */
+  #vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 58%, rgba(0,0,0,.22) 100%); }
+  body[data-screen="menu"] #hud, body[data-screen="end"] #hud { opacity: 0; }
+
+  #matchTag { position: absolute; top: 14px; left: 14px; display: flex; align-items: stretch; font: 800 15px 'Barlow Condensed', sans-serif;
+              letter-spacing: .06em; box-shadow: 0 3px 12px rgba(0,0,0,.35); }
+  #matchTag b { background: var(--gold); color: #1b1300; padding: 3px 10px; }
+  #matchTag span { background: var(--panel); padding: 3px 10px; }
+
+  #speedGun { position: absolute; top: 14px; right: 14px; display: flex; align-items: stretch; box-shadow: 0 3px 12px rgba(0,0,0,.35);
+              transition: opacity .3s, transform .3s; }
+  #speedGun:has(#speed:empty) { opacity: 0; transform: translateY(-8px); }
+  #speedGun > small { background: var(--red); font: 800 13px 'Barlow Condensed', sans-serif; letter-spacing: .1em; padding: 6px 8px; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; }
+  #speed { background: var(--panel); padding: 4px 14px; font: 800 34px 'Barlow Condensed', sans-serif; line-height: 1.1; }
+  #speed small { display: block; font: 600 12px Inter, sans-serif; color: var(--muted); letter-spacing: .04em; }
+
+  /* Scorebar */
+  #scorebar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(980px, calc(100vw - 24px));
+              display: grid; grid-template-columns: auto auto 1fr 1fr auto; align-items: stretch; height: 58px;
+              box-shadow: 0 6px 24px rgba(0,0,0,.45); font-family: 'Barlow Condensed', sans-serif; }
+  #scorebar > div { display: flex; flex-direction: column; justify-content: center; padding: 0 14px; background: var(--panel); white-space: nowrap; overflow: hidden; }
+  .sb-team { background: linear-gradient(135deg, var(--teal), #0a5a57) !important; clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%); padding-right: 22px !important; }
+  .sb-team b { font: 800 26px 'Barlow Condensed', sans-serif; letter-spacing: .04em; }
+  .sb-team small { font: 600 11px Inter, sans-serif; color: rgba(255,255,255,.75); letter-spacing: .08em; margin-top: -4px; }
+  .sb-score { background: linear-gradient(180deg, #ffd65c, #f2b705) !important; color: #1b1300; flex-direction: row !important; align-items: center !important; gap: 10px;
+              clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%); padding: 0 24px !important; margin-left: -10px; }
+  .sb-score b { font: 800 38px 'Barlow Condensed', sans-serif; line-height: 1; }
+  .sb-score span { font: 800 18px 'Barlow Condensed', sans-serif; opacity: .75; }
+  .sb-person span { font: 600 12px Inter, sans-serif; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .sb-person b { font: 800 24px 'Barlow Condensed', sans-serif; line-height: 1.05; }
+  .sb-person b em { font-style: normal; font-size: 16px; color: var(--muted); font-weight: 600; }
+  .sb-person.bat { border-left: 4px solid var(--teal); }
+  .sb-person.bowl { border-left: 4px solid #3a5a9a; }
+  #sbInfo { background: var(--navy2) !important; text-align: right; font: 800 19px 'Barlow Condensed', sans-serif; line-height: 1.15; }
+  #sbInfo span { color: var(--gold); }
+  #sbInfo small { display: block; font: 600 12px Inter, sans-serif; color: var(--muted); }
+  #scorebar > #thisOver { position: absolute; right: 0; bottom: 100%; margin-bottom: 6px; display: flex; flex-direction: row; gap: 4px;
+                          background: none; padding: 0; overflow: visible; }
+  #thisOver b { min-width: 26px; height: 26px; padding: 0 5px; border-radius: 13px; display: flex; align-items: center; justify-content: center;
+                background: rgba(9,20,40,.85); font: 800 15px 'Barlow Condensed', sans-serif; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+  #thisOver b.four { background: var(--blue); } #thisOver b.six { background: var(--purple); } #thisOver b.out { background: var(--red); }
+  #thisOver b.wd { background: #4a5568; font-size: 12px; }
+  @media (max-width: 720px) {
+    #scorebar { grid-template-columns: auto auto 1fr auto; height: 52px; }
+    .sb-person.bowl { display: none !important; }
+    .sb-score b { font-size: 30px; }
+  }
+
+  /* Big event graphics: FOUR, SIX, OUT */
+  #event { position: absolute; top: 26%; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; opacity: 0; }
+  #event .tag { font: italic 800 clamp(64px, 13vw, 140px) 'Barlow Condensed', sans-serif; line-height: .9; padding: 6px 48px 2px;
+                letter-spacing: .02em; text-shadow: 0 6px 30px rgba(0,0,0,.4); clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%); }
+  #event .sub { margin-top: 8px; background: var(--panel); padding: 6px 18px; font: 600 16px Inter, sans-serif; letter-spacing: .02em;
+                clip-path: polygon(3% 0, 100% 0, 97% 100%, 0 100%); }
+  #event.four .tag { background: linear-gradient(90deg, #1f5fd6, var(--blue)); }
+  #event.six .tag { background: linear-gradient(90deg, #6a1fd0, var(--purple)); }
+  #event.out .tag { background: linear-gradient(90deg, #b51f2c, var(--red)); }
+  #event.wide .tag, #event.info .tag { font-size: clamp(40px, 7vw, 72px); background: linear-gradient(90deg, var(--navy2), #24467f); }
+  #event.show { animation: evIn 2s ease forwards; }
+  #event.persist { opacity: 1; animation: evHold .35s ease; }
+  @keyframes evHold { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+  @keyframes evIn {
+    0% { opacity: 0; transform: translateX(-60px) skewX(-8deg); }
+    10% { opacity: 1; transform: translateX(0) skewX(0); }
+    80% { opacity: 1; transform: translateX(0); }
+    100% { opacity: 0; transform: translateX(40px); }
+  }
+
+  /* Timing meter */
+  #timingBox { position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); width: min(360px, 80vw); text-align: center;
+               opacity: 0; transition: opacity .2s; }
+  #timingBox.show { opacity: 1; }
+  #timing { font: 800 22px 'Barlow Condensed', sans-serif; text-shadow: 0 2px 8px rgba(0,0,0,.7); margin-bottom: 4px; }
+  #tmeter { position: relative; height: 12px; border-radius: 2px; overflow: hidden; display: flex; box-shadow: 0 2px 10px rgba(0,0,0,.4); background: #6b1d24; }
+  #tmeter i { display: block; height: 100%; }
+  #tmark { position: absolute; top: -4px; width: 4px; height: 20px; background: #fff; box-shadow: 0 0 6px #000; transform: translateX(-2px); transition: left .15s; }
+  #tlabels { display: flex; justify-content: space-between; font: 700 10px Inter, sans-serif; letter-spacing: .1em; color: var(--muted); margin-top: 3px; text-shadow: 0 1px 3px #000; }
+
+  #meter { position: absolute; left: 16px; bottom: 96px; width: 12px; height: 110px; border-radius: 2px; background: rgba(9,20,40,.7);
+           border: 1px solid rgba(255,255,255,.25); }
+  #meter #meterFill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, var(--teal), var(--gold)); }
+  #meter i { position: absolute; left: -4px; right: -4px; bottom: 40%; border-top: 2px solid #fff; }
+  #meter span { position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%); font: 700 9px Inter, sans-serif; color: var(--muted); letter-spacing: .1em; }
+  #meter.flash { box-shadow: 0 0 0 3px rgba(185, 246, 202, .9); }
+  #hint { position: absolute; top: 52px; left: 14px; max-width: min(520px, 70vw); color: #fff; font-size: 14px; background: rgba(9,20,40,.7);
+          padding: 6px 12px; border-left: 3px solid var(--gold); }
+  #hint:empty { display: none; }
+  /* Field map: fielders, ball and this innings' shots, seen from above with the bowler at the top. */
+  #fieldMap { position: absolute; top: 84px; right: 14px; width: 150px; height: 150px; border-radius: 50%;
+              box-shadow: 0 3px 14px rgba(0,0,0,.4); }
+  #fieldKey { position: absolute; top: 240px; right: 14px; width: 150px; display: flex; justify-content: center; gap: 10px;
+              font: 600 10px Inter, sans-serif; color: #fff; text-shadow: 0 1px 3px #000; }
+  #fieldKey i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+  @media (max-width: 720px) { #fieldMap { width: 110px; height: 110px; top: 76px; } #fieldKey { top: 192px; width: 110px; gap: 6px; } }
+
+  /* ---------------- Menus ---------------- */
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; overflow-y: auto;
+             background: radial-gradient(ellipse at center, rgba(11,26,51,.35), rgba(6,14,28,.88)); }
+  .overlay.show { display: flex; }
+  #menu { justify-content: flex-start; background: linear-gradient(90deg, rgba(6,14,28,.94) 0%, rgba(6,14,28,.75) 42%, rgba(6,14,28,0) 75%); }
+  #menu .card { margin: auto auto auto max(16px, 5vw); }
+  .card { max-width: 560px; width: 100%; background: transparent; padding: 8px 4px; margin: auto; }
+  .panel { background: var(--panel); border-top: 3px solid var(--gold); padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+  .brand { font: italic 800 clamp(56px, 11vw, 92px) 'Barlow Condensed', sans-serif; line-height: .85; margin: 0; letter-spacing: .01em;
+           background: linear-gradient(180deg, #fff 40%, #ffd65c); -webkit-background-clip: text; background-clip: text; color: transparent;
+           filter: drop-shadow(0 4px 14px rgba(0,0,0,.5)); }
+  .tagline { font: 700 13px Inter, sans-serif; letter-spacing: .22em; color: var(--gold); margin: 6px 0 18px; text-transform: uppercase; }
+  .card h2 { font: italic 800 44px 'Barlow Condensed', sans-serif; margin: 0 0 4px; text-align: center; line-height: 1; }
+  .card p { color: var(--muted); margin: 6px 0; }
+  .lbl { font: 700 11px Inter, sans-serif; letter-spacing: .18em; color: var(--muted); margin: 18px 0 8px; text-transform: uppercase; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .seg button { padding: 12px 6px; display: flex; flex-direction: column; align-items: center; gap: 1px; border-radius: 2px;
+                font: 800 19px 'Barlow Condensed', sans-serif; letter-spacing: .03em; clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%); }
+  .seg button small { font: 600 11px Inter, sans-serif; color: var(--muted); letter-spacing: 0; }
+  .seg button.on { background: linear-gradient(180deg, rgba(255,214,92,.28), rgba(242,183,5,.18)); border-color: var(--gold); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 22px; }
+  .row.center { justify-content: center; }
+  .small { font-size: 13px; }
+  details.how { margin-top: 16px; color: var(--muted); font-size: 13px; }
+  details.how summary { cursor: pointer; color: #fff; font-weight: 600; }
+  details.how ul { padding-left: 18px; margin: 8px 0 0; }
+  details.how li { margin: 4px 0; }
+
+  /* End-of-innings scorecard */
+  #end .card { max-width: 680px; }
+  .result { text-align: center; margin-bottom: 14px; }
+  .result h2 { font-size: 54px; }
+  .result.won h2 { color: var(--gold); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 14px 0; text-align: center; }
+  .stats div { background: rgba(255,255,255,.06); padding: 8px; }
+  .stats b { display: block; font: 800 28px 'Barlow Condensed', sans-serif; line-height: 1.1; }
+  .stats span { font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+  table.card-t { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+  table.card-t th { text-align: right; font: 700 11px Inter, sans-serif; letter-spacing: .1em; color: var(--muted); padding: 6px 8px; background: rgba(255,255,255,.05); }
+  table.card-t th:first-child, table.card-t td:first-child { text-align: left; }
+  table.card-t td { text-align: right; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  table.card-t td small { color: var(--muted); display: block; font-size: 11px; }
+  table.card-t td b { font: 800 18px 'Barlow Condensed', sans-serif; }
+</style>
+</head>
+<body data-screen="menu">
+<div id="vignette"></div>
+<div id="hud">
+  <div id="matchTag"><b id="mtMode">CHASE</b><span id="mtLevel">COUNTY</span></div>
+  <div id="speedGun"><small>SPEED</small><div id="speed"></div></div>
+  <div id="hint"></div>
+  <div id="event"><div class="tag" id="evTag"></div><div class="sub" id="evSub"></div></div>
+  <div id="timingBox">
+    <div id="timing"></div>
+    <div id="tmeter"><i id="tzE"></i><i id="tzG1"></i><i id="tzP"></i><i id="tzG2"></i><i id="tzL"></i><b id="tmark"></b></div>
+    <div id="tlabels"><span>EARLY</span><span>PERFECT</span><span>LATE</span></div>
+  </div>
+  <canvas id="fieldMap" width="300" height="300" aria-label="Field map"></canvas>
+  <div id="fieldKey"><span><i style="background:#1b2f5e;box-shadow:0 0 0 1.5px #ffcc33"></i>Fielders</span><span><i style="background:#ff3b3b"></i>Ball</span></div>
+  <div id="meter" title="Bat speed"><div id="meterFill"></div><i></i><span>BAT</span></div>
+  <div id="scorebar">
+    <div class="sb-team"><b>MOCON XI</b><small>BATTING</small></div>
+    <div class="sb-score"><b id="sbScore">0/0</b><span id="sbOvers">0.0 ov</span></div>
+    <div class="sb-person bat"><span id="sbBatName">Batter</span><b id="sbBatFig">0 <em>(0)</em></b></div>
+    <div class="sb-person bowl"><span id="sbBowlName">Bowler</span><b id="sbBowlFig">0-0 <em>(0.0)</em></b></div>
+    <div id="sbInfo"></div>
+    <div id="thisOver"></div>
+  </div>
+</div>
+
+<div class="overlay show" id="menu">
+  <div class="card">
+    <div class="panel">
+      <h1 class="brand">BOUNDARY</h1>
+      <div class="tagline">Phone-controlled cricket</div>
+      <div class="lbl">Match</div>
+      <div class="seg" id="modes"></div>
+      <div class="lbl">Opposition bowling</div>
+      <div class="seg" id="diffs"></div>
+      <div class="lbl">You bat</div>
+      <div class="seg" id="hands" style="grid-template-columns: repeat(2, 1fr)"></div>
+      <div class="row">
+        <button class="primary" id="btnPhone">Connect phone</button>
+        <button id="btnMouse">Play with mouse / keys</button>
+      </div>
+      <p class="small" id="menuStatus"></p>
+      <details class="how">
+        <summary>How to bat</summary>
+        <ul>
+          <li>Face the screen and hold your phone upright like a bat handle, either side toward the TV. Press Start to take guard.</li>
+          <li>After taking guard you play three practice shots: straight, leg side and off side. Real shots are then placed by comparing them with your practice shots. Early timing pulls the ball to the leg side, late timing to the off side.</li>
+          <li>To hit it <b>in the air</b>, open the face upward or swing big and finish high. Keep the face over the ball and finish low to keep it on the ground.</li>
+          <li>For a right-hander the leg side is the left of the screen and the off side the right; it's the other way round for a left-hander.</li>
+          <li>Mouse: move up to lift the bat, flick down to swing. Keys: arrow keys to swing, Shift to loft. Esc pauses.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="pause">
+  <div class="card">
+    <div class="panel">
+      <h2 id="pauseTitle">Paused</h2>
+      <p id="pauseText" style="text-align:center">Press Pause on your phone, Esc, or Resume.</p>
+      <div class="row center">
+        <button class="primary" id="btnResume">Resume</button>
+        <button id="btnReconnect" style="display:none">Reconnect phone</button>
+        <button id="btnRecal" style="display:none">Retake guard</button>
+        <button id="btnQuit">Quit to menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="end">
+  <div class="card">
+    <div class="panel">
+      <div class="result" id="resultBox"><h2 id="endTitle">–</h2><p id="endText"></p></div>
+      <div class="stats">
+        <div><b id="stRuns">0</b><span>runs</span></div>
+        <div><b id="stBalls">0</b><span>balls</span></div>
+        <div><b id="stFours">0</b><span>fours</span></div>
+        <div><b id="stSixes">0</b><span>sixes</span></div>
+      </div>
+      <table class="card-t"><thead><tr><th>Batting</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead><tbody id="cardBat"></tbody></table>
+      <table class="card-t"><thead><tr><th>Bowling</th><th>O</th><th>R</th><th>W</th><th>Econ</th></tr></thead><tbody id="cardBowl"></tbody></table>
+      <p id="endBest" class="small" style="text-align:center;margin-top:12px"></p>
+      <div class="row center">
+        <button class="primary" id="btnAgain">Play again</button>
+        <button id="btnMenu">Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module" src="./game.js?v=20261115-foot2"></script>
+</body>
+</html>

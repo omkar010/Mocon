@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sword Duel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0d12; --fg: #efe9dc; --muted: #a39d90; --gold: #e8b54a; --red: #e0453a;
+    --panel: rgba(14, 16, 22, .82); --line: rgba(232, 181, 74, .35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg); font: 15px/1.5 Inter, system-ui, sans-serif; }
+  canvas { display: block; }
+  button { font: 600 15px Inter, system-ui, sans-serif; padding: 12px 22px; border-radius: 10px; border: 1px solid var(--line);
+           background: rgba(255,255,255,.04); color: var(--fg); cursor: pointer; }
+  button:hover { background: rgba(232,181,74,.12); }
+  button.primary { background: var(--gold); color: #1a1408; border-color: var(--gold); }
+  button.primary:hover { background: #f3c766; }
+  button:disabled { opacity: .45; cursor: default; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  .bars { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 16px; }
+  .bar { width: min(340px, 42vw); }
+  .bar .label { font: 600 13px Cinzel, serif; letter-spacing: .06em; margin-bottom: 4px; text-shadow: 0 1px 3px #000; }
+  .bar .track { height: 12px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.18); border-radius: 6px; overflow: hidden; }
+  .bar .fill { height: 100%; width: 100%; transition: width .18s; }
+  #playerFill { background: linear-gradient(90deg, #3e9b57, #6fd28a); }
+  #enemyFill { background: linear-gradient(90deg, #b23128, #ef6a4f); margin-left: auto; }
+  #enemyBar { text-align: right; }
+  #furyWrap { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: min(300px, 70vw); text-align: center; }
+  #furyWrap .track { height: 8px; }
+  #furyFill { background: linear-gradient(90deg, #a2731d, var(--gold)); width: 0; }
+  #furyWrap.ready .label { color: var(--gold); animation: pulse 0.8s infinite alternate; }
+  #furyWrap.active #furyFill { background: #fff3c4; }
+  @keyframes pulse { to { opacity: .45; } }
+
+  .zone { position: absolute; opacity: 0; transition: opacity .06s; }
+  #zone-left  { left: 0; top: 15%; bottom: 15%; width: 14vw; background: radial-gradient(ellipse at left, rgba(224,69,58,.85), transparent 70%); }
+  #zone-right { right: 0; top: 15%; bottom: 15%; width: 14vw; background: radial-gradient(ellipse at right, rgba(224,69,58,.85), transparent 70%); }
+  #zone-high  { top: 0; left: 20%; right: 20%; height: 16vh; background: radial-gradient(ellipse at top, rgba(224,69,58,.85), transparent 70%); }
+  #aim { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+         border: 2px solid rgba(255,255,255,.7); box-shadow: 0 0 6px rgba(0,0,0,.6); transition: border-color .1s; }
+  #aim.inzone { border-color: var(--gold); }
+  #flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 35%, rgba(200,20,20,.75)); opacity: 0; }
+  #banner { position: absolute; top: 26%; left: 0; right: 0; text-align: center; font: 800 clamp(28px, 6vw, 64px) Cinzel, serif;
+            letter-spacing: .05em; text-shadow: 0 2px 18px #000; opacity: 0; transition: opacity .2s, transform .2s; }
+  #banner.show { opacity: 1; }
+  #hint { position: absolute; bottom: 64px; left: 16px; right: 16px; text-align: center; color: var(--muted); text-shadow: 0 1px 4px #000; }
+  .pop { position: absolute; font: 800 26px Cinzel, serif; color: #fff; text-shadow: 0 2px 8px #000; pointer-events: none;
+         animation: pop .9s ease-out forwards; }
+  .pop.crit { color: var(--gold); font-size: 34px; }
+  .pop.block { color: #9fb3c8; font-size: 20px; }
+  @keyframes pop { from { transform: translate(-50%, 0) scale(1.2); opacity: 1; } to { transform: translate(-50%, -70px) scale(1); opacity: 0; } }
+  #phoneBadge { position: absolute; top: 58px; left: 16px; font-size: 12px; color: var(--muted); }
+
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px;
+             background: radial-gradient(ellipse at center, rgba(11,13,18,.55), rgba(11,13,18,.92)); }
+  .overlay.show { display: flex; }
+  .card { max-width: 560px; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px; text-align: center; }
+  .card h1 { font: 800 clamp(34px, 7vw, 54px) Cinzel, serif; margin: 0 0 4px; color: var(--gold); letter-spacing: .04em; }
+  .card h2 { font: 800 28px Cinzel, serif; margin: 0 0 10px; }
+  .card p { color: var(--muted); margin: 8px 0; }
+  .card .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .how { text-align: left; margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .how li { padding-left: 26px; position: relative; color: var(--fg); }
+  .how li::before { content: '⚔'; position: absolute; left: 0; color: var(--gold); }
+  .small { font-size: 13px; }
+  #menuStatus { min-height: 1.5em; }
+  .difficulty { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 20px; }
+  .difficulty button { padding: 10px 6px; font-family: Cinzel, serif; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .difficulty button small { font: 400 11px Inter, system-ui, sans-serif; color: var(--muted); }
+  .difficulty button.on { border-color: var(--gold); background: rgba(232,181,74,.16); color: var(--gold); }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="bars">
+    <div class="bar"><div class="label">You</div><div class="track"><div class="fill" id="playerFill"></div></div></div>
+    <div class="bar" id="enemyBar"><div class="label" id="enemyName">–</div><div class="track"><div class="fill" id="enemyFill"></div></div></div>
+  </div>
+  <div id="phoneBadge"></div>
+  <div class="zone" id="zone-left"></div>
+  <div class="zone" id="zone-right"></div>
+  <div class="zone" id="zone-high"></div>
+  <div id="aim"></div>
+  <div id="flash"></div>
+  <div id="banner"></div>
+  <div id="hint"></div>
+  <div id="furyWrap" class="bar"><div class="label">Fury</div><div class="track"><div class="fill" id="furyFill"></div></div></div>
+</div>
+
+<div class="overlay show" id="menu">
+  <div class="card">
+    <h1>Sword Duel</h1>
+    <p>One arena. One blade. Your phone is the hilt.</p>
+    <ul class="how">
+      <li><b>Swing</b> fast to slash. Strike where their sword isn't guarding.</li>
+      <li>When a side of the screen <b>glows red</b>, point your sword at it to <b>parry</b>. Parried foes take double damage.</li>
+      <li>Parries fill <b>Fury</b>. When full, press Fury for 4 seconds of triple damage that breaks any guard.</li>
+    </ul>
+    <div class="difficulty" role="group" aria-label="Difficulty">
+      <button data-difficulty="squire">Squire<small>3 foes · forgiving</small></button>
+      <button data-difficulty="knight">Knight<small>5 foes · they read you</small></button>
+      <button data-difficulty="legend">Legend<small>5 foes · brutal</small></button>
+    </div>
+    <div class="row">
+      <button class="primary" id="btnPhone">Connect phone</button>
+      <button id="btnMouse">Play with mouse</button>
+    </div>
+    <p class="small" id="menuStatus"></p>
+    <p class="small">Phone: install the Mocon app, open it, then connect. Needs Chrome or Edge.<br>
+      Mouse: move to aim, flick quickly to slash, Space for Fury, Esc to pause.</p>
+  </div>
+</div>
+
+<div class="overlay" id="pause">
+  <div class="card">
+    <h2 id="pauseTitle">Paused</h2>
+    <p id="pauseText">Press Pause on your phone, Esc, or the button below to continue.</p>
+    <div class="row">
+      <button class="primary" id="btnResume">Resume</button>
+      <button id="btnReconnect" style="display:none">Reconnect phone</button>
+      <button id="btnToMouse" style="display:none">Switch to mouse</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="end">
+  <div class="card">
+    <h2 id="endTitle">–</h2>
+    <p id="endText"></p>
+    <div class="row"><button class="primary" id="btnAgain">Fight again</button></div>
+  </div>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module" src="./game.js?v=20261114-2350"></script>
+</body>
+</html>

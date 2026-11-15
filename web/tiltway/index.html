@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiltway</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #12312f; --fg: #fdf6e8; --muted: #b9cbc3; --accent: #f4a259; --good: #8cd17d; --panel: rgba(12, 34, 32, .9); --line: rgba(244, 162, 89, .35); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg); font: 15px/1.5 Inter, system-ui, sans-serif; }
+  canvas { display: block; }
+  button { font: 600 14px Inter, system-ui, sans-serif; padding: 11px 20px; border-radius: 12px; border: 1px solid var(--line);
+           background: rgba(255,255,255,.05); color: var(--fg); cursor: pointer; }
+  button:hover { background: rgba(244,162,89,.14); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #2a1606; }
+  button.primary:hover { background: #f7b67a; }
+  button:disabled { opacity: .45; cursor: default; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #top { position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+  #level { font: 700 20px Fredoka, sans-serif; }
+  #level small { display: block; font: 400 12px Inter, sans-serif; color: var(--muted); }
+  #stats { text-align: right; font: 700 20px Fredoka, sans-serif; }
+  #stats small { display: block; font: 400 12px Inter, sans-serif; color: var(--muted); }
+  #banner { position: absolute; top: 30%; left: 0; right: 0; text-align: center; font: 700 clamp(30px, 7vw, 60px) Fredoka, sans-serif;
+            text-shadow: 0 3px 20px rgba(0,0,0,.5); opacity: 0; transition: opacity .25s; }
+  #banner.show { opacity: 1; }
+  #hint { position: absolute; bottom: 20px; left: 16px; right: 16px; text-align: center; color: var(--muted); text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+  #tilt { position: absolute; bottom: 20px; right: 20px; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); }
+  #tilt div { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--accent); left: 50%; top: 50%; }
+
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; overflow-y: auto;
+             background: radial-gradient(ellipse at center, rgba(18,49,47,.55), rgba(10,26,25,.93)); }
+  .overlay.show { display: flex; }
+  .card { max-width: 600px; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 26px; margin: auto; }
+  .card h1 { font: 700 clamp(38px, 8vw, 58px) Fredoka, sans-serif; margin: 0; text-align: center; color: var(--accent); letter-spacing: .02em; }
+  .card h2 { font: 700 28px Fredoka, sans-serif; margin: 0 0 6px; text-align: center; }
+  .card p { color: var(--muted); margin: 6px 0; text-align: center; }
+  .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+  @media (max-width: 480px) { .levels { grid-template-columns: repeat(2, 1fr); } }
+  .lvl { padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .lvl b { font: 700 16px Fredoka, sans-serif; }
+  .lvl small { color: var(--muted); font-size: 12px; }
+  .lvl .stars { color: var(--accent); letter-spacing: 2px; }
+  .lvl.on { border-color: var(--accent); background: rgba(244,162,89,.16); }
+  .lvl:disabled { opacity: .35; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .small { font-size: 13px; }
+  .bigstars { text-align: center; font-size: 46px; color: var(--accent); letter-spacing: 8px; margin: 6px 0; }
+  .bigstars .off { color: rgba(255,255,255,.15); }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="top">
+    <div id="level"></div>
+    <div id="stats"></div>
+  </div>
+  <div id="banner"></div>
+  <div id="hint"></div>
+  <div id="tilt"><div></div></div>
+</div>
+
+<div class="overlay show" id="menu">
+  <div class="card">
+    <h1>Tiltway</h1>
+    <p>Tilt your phone like a tray to roll the ball home. Mind the holes and the edges.</p>
+    <div class="levels" id="levels"></div>
+    <div class="row">
+      <button class="primary" id="btnPhone">Connect phone</button>
+      <button id="btnMouse">Play with mouse / keys</button>
+    </div>
+    <p class="small" id="menuStatus"></p>
+    <p class="small">Phone: hold it flat, screen up, top pointing at your screen. Mouse: the ball rolls toward the pointer. Keys: arrows or WASD. R restarts, Esc pauses.</p>
+  </div>
+</div>
+
+<div class="overlay" id="pause">
+  <div class="card">
+    <h2 id="pauseTitle">Paused</h2>
+    <p id="pauseText">Press Pause on your phone, Esc, or Resume.</p>
+    <div class="row">
+      <button class="primary" id="btnResume">Resume</button>
+      <button id="btnReconnect" style="display:none">Reconnect phone</button>
+      <button id="btnLevels">Levels</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="done">
+  <div class="card">
+    <h2 id="doneTitle">Level complete</h2>
+    <div class="bigstars" id="doneStars"></div>
+    <p id="doneText"></p>
+    <p id="doneBest" class="small"></p>
+    <div class="row">
+      <button class="primary" id="btnNext">Next level</button>
+      <button id="btnRetry">Retry</button>
+      <button id="btnLevels2">Levels</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module" src="./game.js?v=20261114-2350"></script>
+</body>
+</html>

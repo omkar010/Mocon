@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #07060d; --fg: #eef0ff; --muted: #9a9cc0; --cyan: #33e4ff; --pink: #ff3fb4; --gold: #ffd166; --red: #ff4d5e;
+          --panel: rgba(12, 10, 26, .86); --line: rgba(51, 228, 255, .3); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg); font: 15px/1.5 Inter, system-ui, sans-serif; }
+  canvas { display: block; }
+  button { font: 600 14px Inter, system-ui, sans-serif; padding: 11px 20px; border-radius: 10px; border: 1px solid var(--line);
+           background: rgba(255,255,255,.04); color: var(--fg); cursor: pointer; }
+  button:hover { background: rgba(51,228,255,.1); }
+  button.primary { background: var(--cyan); border-color: var(--cyan); color: #05121a; }
+  button.primary:hover { background: #7aefff; }
+  button:disabled { opacity: .45; cursor: default; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #top { position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  #score { font: 800 28px Orbitron, sans-serif; letter-spacing: .04em; text-shadow: 0 0 12px rgba(51,228,255,.6); }
+  #mult { font: 600 13px Orbitron, sans-serif; color: var(--gold); }
+  #healthWrap { width: min(260px, 40vw); text-align: right; }
+  #healthWrap .label { font: 600 11px Orbitron, sans-serif; color: var(--muted); letter-spacing: .1em; }
+  .track { height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+  #health { height: 100%; width: 100%; background: linear-gradient(90deg, var(--pink), var(--cyan)); transition: width .15s; }
+  #progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
+  #progress div { height: 100%; width: 0; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  #combo { position: absolute; left: 0; right: 0; top: 18%; text-align: center; font: 800 clamp(24px, 5vw, 44px) Orbitron, sans-serif;
+           opacity: .9; text-shadow: 0 0 16px rgba(255,63,180,.7); }
+  #combo small { display: block; font-size: 12px; letter-spacing: .3em; color: var(--muted); text-shadow: none; }
+  #hint { position: absolute; bottom: 24px; left: 16px; right: 16px; text-align: center; color: var(--muted); }
+  #countdown { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 800 96px Orbitron, sans-serif;
+               text-shadow: 0 0 30px var(--cyan); opacity: 0; }
+  .pop { position: absolute; transform: translate(-50%, -50%); font: 800 20px Orbitron, sans-serif; pointer-events: none;
+         animation: pop .6s ease-out forwards; text-shadow: 0 0 10px currentColor; }
+  .pop.perfect { color: var(--gold); }
+  .pop.good { color: var(--cyan); }
+  .pop.miss, .pop.wrong, .pop.mine { color: var(--red); }
+  @keyframes pop { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -50px; } }
+  #flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 40%, rgba(255,40,70,.55)); opacity: 0; }
+
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; overflow-y: auto;
+             background: radial-gradient(ellipse at center, rgba(7,6,13,.5), rgba(7,6,13,.94)); }
+  .overlay.show { display: flex; }
+  .card { max-width: 620px; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 26px; margin: auto; }
+  .card h1 { font: 800 clamp(34px, 7vw, 52px) Orbitron, sans-serif; margin: 0; text-align: center; letter-spacing: .08em;
+             background: linear-gradient(90deg, var(--cyan), var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card h2 { font: 800 24px Orbitron, sans-serif; margin: 0 0 8px; text-align: center; }
+  .card p { color: var(--muted); margin: 6px 0; text-align: center; }
+  .label2 { font: 600 11px Orbitron, sans-serif; letter-spacing: .14em; color: var(--muted); margin: 18px 0 8px; }
+  .songs { display: grid; gap: 8px; }
+  .song { display: flex; justify-content: space-between; align-items: center; text-align: left; padding: 12px 14px; }
+  .song b { font-family: Orbitron, sans-serif; letter-spacing: .04em; }
+  .song small { color: var(--muted); }
+  .song.on, .seg button.on { border-color: var(--cyan); background: rgba(51,228,255,.12); }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .offset { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .offset button { padding: 6px 12px; }
+  #offsetVal { min-width: 70px; text-align: center; font-family: Orbitron, sans-serif; }
+  .small { font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; text-align: center; }
+  .stats div { background: rgba(255,255,255,.04); border-radius: 10px; padding: 10px; }
+  .stats b { display: block; font: 800 22px Orbitron, sans-serif; }
+  .stats span { font-size: 12px; color: var(--muted); }
+  #grade { font: 800 72px Orbitron, sans-serif; text-align: center; line-height: 1; margin: 6px 0; text-shadow: 0 0 24px var(--pink); }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="top">
+    <div><div id="score">0</div><div id="mult"></div></div>
+    <div id="healthWrap"><div class="label">ENERGY</div><div class="track"><div id="health"></div></div></div>
+  </div>
+  <div id="combo"></div>
+  <div id="countdown"></div>
+  <div id="flash"></div>
+  <div id="hint"></div>
+  <div id="progress"><div></div></div>
+</div>
+
+<div class="overlay show" id="menu">
+  <div class="card">
+    <h1>CADENCE</h1>
+    <p>Blocks fly in on the beat. Swing the way each arrow points to cut it. Never cut the red mines.</p>
+    <div class="label2">SONG</div>
+    <div class="songs" id="songs"></div>
+    <div class="label2">DIFFICULTY</div>
+    <div class="seg" id="diffs"></div>
+    <div class="label2">TIMING OFFSET</div>
+    <div class="offset">
+      <button id="offMinus">− 10 ms</button><span id="offsetVal">0 ms</span><button id="offPlus">+ 10 ms</button>
+    </div>
+    <p class="small">Raise it if you're always judged late, lower it if early. Your results screen suggests a value.</p>
+    <div class="row">
+      <button class="primary" id="btnPhone">Connect phone</button>
+      <button id="btnMouse">Play with mouse / keys</button>
+    </div>
+    <p class="small" id="menuStatus"></p>
+    <p class="small">Mouse: flick in the arrow's direction. Keyboard: arrow keys, Space for dots. Esc pauses.</p>
+  </div>
+</div>
+
+<div class="overlay" id="pause">
+  <div class="card">
+    <h2 id="pauseTitle">Paused</h2>
+    <p id="pauseText">Press Pause on your phone, Esc, or Resume.</p>
+    <div class="row">
+      <button class="primary" id="btnResume">Resume</button>
+      <button id="btnReconnect" style="display:none">Reconnect phone</button>
+      <button id="btnQuit">Quit to menu</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="results">
+  <div class="card">
+    <h2 id="resTitle">Cleared</h2>
+    <div id="grade">A</div>
+    <p id="resSong"></p>
+    <div class="stats">
+      <div><b id="resScore">0</b><span>score</span></div>
+      <div><b id="resAcc">0%</b><span>accuracy</span></div>
+      <div><b id="resCombo">0</b><span>max combo</span></div>
+      <div><b id="resPerfect">0</b><span>perfect</span></div>
+      <div><b id="resGood">0</b><span>good</span></div>
+      <div><b id="resMiss">0</b><span>miss</span></div>
+    </div>
+    <p id="resTiming" class="small"></p>
+    <p id="resBest" class="small"></p>
+    <div class="row">
+      <button class="primary" id="btnRetry">Play again</button>
+      <button id="btnMenu">Song select</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module" src="./game.js?v=20261114-2350"></script>
+</body>
+</html>
